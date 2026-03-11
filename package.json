@@ -1,0 +1,21 @@
+{
+  "name": "codiva",
+  "version": "1.0.0",
+  "description": "Codiva lets developers describe what they want to build in plain language and handles everything else — code generation, containerisation, and deployment — delivering a live application at a dedicated URL in seconds. It's aimed at reducing the gap between an idea and a working, accessible prototype.",
+  "main": "index.js",
+  "scripts": {
+    "dev:backend": "cd apps/backend && npm run dev"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ranjitparmar/codiva.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/ranjitparmar/codiva/issues"
+  },
+  "homepage": "https://github.com/ranjitparmar/codiva#readme"
+}
