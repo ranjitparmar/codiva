@@ -6,3 +6,57 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+enum GenerationTier {
+  STANDARD
+  PRO
+}
+
+enum GenerationStatus {
+  PENDING
+  GENERATING
+  READY
+  FAILED
+}
+
+model User {
+  id String @id @default(uuid())
+  email String @unique
+  passwordHash String
+  isVerified Boolean @default(false)
+  credits Int @default(5)
+  lastCreditsClaimed DateTime?
+  sites Site[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Site {
+  id String @id @default(uuid())
+  subdomain String? @unique
+  filePath String?
+  userId String
+  generations Generation[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Generation {
+  id String @id @default(uuid())
+  prompt String
+  requestedSubdomain String?
+  tier GenerationTier @default(STANDARD)
+  status GenerationStatus @default(PENDING)
+  creditsUsed Int
+  errorMsg String?
+  siteId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  site Site @relation(fields: [siteId], references: [id], onDelete: Cascade)
+}

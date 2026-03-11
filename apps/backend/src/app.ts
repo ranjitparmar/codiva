@@ -1,4 +1,6 @@
 import express, {Application, Request, Response} from "express";
+import authRoutes from "./modules/auth/auth.routes";
+import { errorHandler } from "./middlewares/errorHandler";
 import cors from "cors";
 
 const app: Application = express();
@@ -14,6 +16,12 @@ app.get("/", (req: Request, res: Response)=>{
         message: "Server is Live"
     })
 })
+
+// routes
+app.use("/api/auth", authRoutes)
+
+// global error handler
+app.use(errorHandler)
 
 // export app
 export default app
