@@ -1,48 +1,40 @@
+import crypto from "crypto";
 import { redis } from "./redis";
 import { constants } from "../config/constants";
+import { AppError } from "../errors";
 
-const key = (email: string) => `otp:${email}`;
-
-export const generateOtp = (): string => {
-  return Math.floor(
-    10 ** (constants.OTP_LENGTH - 1) +
-      Math.random() * 9 * 10 ** (constants.OTP_LENGTH - 1)
-  ).toString();
+export const generateOtp = () => {
+  return String(crypto.randomInt(100000, 999999));
 };
 
-export const saveOtp = async (email: string, otp: string): Promise<void> => {
+export const saveOtp = async (key: string) => {
+  const code = generateOtp();
   await redis.set(
-    key(email),
-    JSON.stringify({ otp, attempts: 0 }),
+    `otp:${key}`,
+    JSON.stringify({ code, attempts: 0 }),
     "EX",
     constants.OTP_EXPIRES_SECONDS
   );
+  return code;
 };
 
-export const verifyOtp = async (
-  email: string,
-  inputOtp: string
-): Promise<{ valid: boolean; reason?: string }> => {
-  const raw = await redis.get(key(email));
+export const verifyOtp = async (key: string, inputCode: string) => {
+  const raw = await redis.get(`otp:${key}`);
+  if (!raw) throw new AppError("Code expired or invalid", 400);
 
-  if (!raw) return { valid: false, reason: "OTP expired or not found" };
+  const data = JSON.parse(raw);
 
-  const { otp, attempts } = JSON.parse(raw);
-
-  if (attempts >= constants.OTP_MAX_ATTEMPTS) {
-    await redis.del(key(email));
-    return { valid: false, reason: "Too many attempts, request a new OTP" };
+  if (data.attempts >= constants.OTP_MAX_ATTEMPTS) {
+    await redis.del(`otp:${key}`);
+    throw new AppError("Too many attempts. Request a new code.", 429);
   }
 
-  if (otp !== inputOtp) {
-    await redis.set(
-      key(email),
-      JSON.stringify({ otp, attempts: attempts + 1 }),
-      "KEEPTTL"
-    );
-    return { valid: false, reason: "Incorrect OTP" };
+  if (data.code !== inputCode) {
+    data.attempts += 1;
+    await redis.set(`otp:${key}`, JSON.stringify(data), "KEEPTTL");
+    throw new AppError("Invalid code", 400);
   }
 
-  await redis.del(key(email));
-  return { valid: true };
+  await redis.del(`otp:${key}`);
+  return true;
 };

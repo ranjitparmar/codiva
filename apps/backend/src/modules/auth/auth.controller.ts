@@ -29,4 +29,18 @@ export const authController = {
     const result = await authService.me(req.userId!);
     res.json({ success: true, user: result });
   }),
+  changePassword: asyncHandler(async (req: Request, res: Response) => {
+    await authService.changePassword(req.userId!, req.body);
+    res.json({ success: true, message: "Password updated successfully" });
+  }),
+
+  forgotPassword: asyncHandler(async (req: Request, res: Response) => {
+    await authService.forgotPassword(req.body);
+    res.json({ success: true, message: "If that email exists, a reset code has been sent" });
+  }),
+
+  resetPassword: asyncHandler(async (req: Request, res: Response) => {
+    await authService.resetPassword(req.body);
+    res.json({ success: true, message: "Password reset successfully" });
+  }),
 };

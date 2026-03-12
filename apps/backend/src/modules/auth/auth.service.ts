@@ -1,7 +1,7 @@
 import bcrypt from "bcrypt";
 import { authRepository } from "../../repositories/auth.repository";
 import { redis } from "../../lib/redis";
-import { generateOtp, saveOtp, verifyOtp } from "../../lib/otp";
+import { saveOtp, verifyOtp } from "../../lib/otp";
 import { sendOtpEmail } from "../../utils/email";
 import { generateToken } from "../../utils/jwt";
 import { constants } from "../../config/constants";
@@ -11,7 +11,15 @@ import {
   UnauthorizedError,
   ValidationError,
 } from "../../errors";
-import type { RegisterInput, LoginInput } from "./auth.schema";
+import type {
+  RegisterInput,
+  LoginInput,
+  VerifyOtpInput,
+  ResendOtpInput,
+  ChangePasswordInput,
+  ForgotPasswordInput,
+  ResetPasswordInput,
+} from "./auth.schema";
 
 export const authService = {
   register: async ({ email, password }: RegisterInput) => {
@@ -21,7 +29,6 @@ export const authService = {
         throw new ConflictError("Email already registered");
       }
 
-      // check for cooldown
       const cooldownKey = `otp:cooldown:${email}`;
       const onCooldown = await redis.get(cooldownKey);
       if (onCooldown) {
@@ -35,11 +42,10 @@ export const authService = {
     const passwordHash = await bcrypt.hash(password, constants.BCRYPT_ROUNDS);
     await authRepository.create(email, passwordHash);
 
-    const otp = generateOtp();
-    await saveOtp(email, otp);
+    // saveOtp generates internally and returns the code
+    const otp = await saveOtp(email);
     await sendOtpEmail(email, otp);
 
-    // set cooldown for emails
     await redis.set(`otp:cooldown:${email}`, "1", "EX", constants.OTP_RESEND_SECONDS);
 
     return { message: "Registered successfully. Check your email for the OTP." };
@@ -50,8 +56,8 @@ export const authService = {
     if (!user) throw new NotFoundError("User not found");
     if (user.isVerified) throw new ConflictError("Email already verified");
 
-    const result = await verifyOtp(email, inputOtp);
-    if (!result.valid) throw new ValidationError(result.reason);
+    // verifyOtp now throws on failure, no return value to check
+    await verifyOtp(email, inputOtp);
 
     const updated = await authRepository.markVerified(email);
     const token = generateToken(updated.id);
@@ -68,8 +74,7 @@ export const authService = {
     const onCooldown = await redis.get(cooldownKey);
     if (onCooldown) throw new ValidationError("Please wait 60 seconds before requesting a new OTP");
 
-    const otp = generateOtp();
-    await saveOtp(email, otp);
+    const otp = await saveOtp(email);
     await sendOtpEmail(email, otp);
     await redis.set(cooldownKey, "1", "EX", constants.OTP_RESEND_SECONDS);
 
@@ -93,5 +98,34 @@ export const authService = {
     const user = await authRepository.findMeById(userId);
     if (!user) throw new NotFoundError("User not found");
     return user;
+  },
+
+  changePassword: async (userId: string, input: ChangePasswordInput) => {
+    const user = await authRepository.findById(userId);
+    if (!user) throw new NotFoundError("User not found");
+
+    const valid = await bcrypt.compare(input.currentPassword, user.passwordHash);
+    if (!valid) throw new UnauthorizedError("Current password is incorrect");
+
+    const hash = await bcrypt.hash(input.newPassword, constants.BCRYPT_ROUNDS);
+    await authRepository.updatePassword(userId, hash);
+  },
+
+  forgotPassword: async (input: ForgotPasswordInput) => {
+    const user = await authRepository.findByEmail(input.email);
+    if (user && user.isVerified) {
+      const otp = await saveOtp(`reset:${input.email}`);
+      await sendOtpEmail(input.email, otp, "reset");
+    }
+  },
+
+  resetPassword: async (input: ResetPasswordInput) => {
+    await verifyOtp(`reset:${input.email}`, input.otp);
+
+    const user = await authRepository.findByEmail(input.email);
+    if (!user) throw new NotFoundError("User not found");
+
+    const hash = await bcrypt.hash(input.newPassword, constants.BCRYPT_ROUNDS);
+    await authRepository.updatePassword(user.id, hash);
   },
 };

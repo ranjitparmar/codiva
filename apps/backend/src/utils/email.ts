@@ -1,27 +1,36 @@
 import { resend } from "../lib/resend";
-import { constants } from "../config/constants";
+import { env } from "../config/env";
 
-const otpTemplate = (otp: string) => {
-    
-    const html = `
-      <div style="font-family: sans-serif; max-width: 400px; margin: 0 auto;">
-        <h2 style="color: #111;">Verify your email</h2>
-        <p style="color: #555;">Use the code below to complete your signup. Expires in 5 minutes.</p>
-        <div style="font-size: 36px; font-weight: bold; letter-spacing: 10px; color: #6366f1; padding: 20px 0;">
-          ${otp}
+export const sendOtpEmail = async (
+  email: string,
+  otp: string,
+  type: "verify" | "reset" = "verify"
+) => {
+  const isReset = type === "reset";
+
+  await resend.emails.send({
+    from: `Codiva <noreply@${env.APP_DOMAIN}>`,
+    to: email,
+    subject: isReset ? "Reset your Codiva password" : "Verify your Codiva account",
+    html: `
+      <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 24px;">
+        <h2 style="font-size: 24px; font-weight: 700; color: #09090b; margin-bottom: 8px;">
+          ${isReset ? "Reset your password" : "Verify your email"}
+        </h2>
+        <p style="color: #71717a; font-size: 15px; margin-bottom: 32px;">
+          ${isReset
+            ? "Use this code to reset your Codiva password. It expires in 5 minutes."
+            : "Enter this code to verify your account. It expires in 5 minutes."}
+        </p>
+        <div style="background: #f4f4f5; border-radius: 12px; padding: 24px; text-align: center; margin-bottom: 32px;">
+          <span style="font-size: 36px; font-weight: 800; letter-spacing: 0.2em; color: #09090b; font-family: monospace;">
+            ${otp}
+          </span>
         </div>
-        <p style="color: #999; font-size: 12px;">If you didn't request this, ignore this email.</p>
+        <p style="color: #a1a1aa; font-size: 13px;">
+          If you didn't request this, you can safely ignore this email.
+        </p>
       </div>
-    `
-
-    return html
-}
-
-export const sendOtpEmail = async (email: string, otp: string) => {
-    await resend.emails.send({
-        from: constants.OTP_MAIL_FROM,
-        to: email,
-        subject: constants.OTP_MAIL_SUBJECT,
-        html: otpTemplate(otp)
-    })
-}
+    `,
+  });
+};

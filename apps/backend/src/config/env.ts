@@ -11,7 +11,10 @@ const envSchema = z.object({
     DATABASE_URL: z.string().min(1),
     RESEND_API_KEY: z.string().min(1),
     REDIS_URL: z.string().min(1),
-    JWT_SECRET: z.string().min(8)
+    JWT_SECRET: z.string().min(8),
+    OPENAI_API_KEY: z.string().min(1),
+    APP_DOMAIN: z.string().default("codiva.ranjitparmar.in"),
+    FRONTEND_URL: z.string().default("http://localhost:3000"),
 });
 
 const parsed = envSchema.safeParse(process.env);
